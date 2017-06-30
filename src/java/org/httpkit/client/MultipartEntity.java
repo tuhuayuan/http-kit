@@ -14,14 +14,20 @@ import java.util.List;
  *         2014/1/1
  */
 public class MultipartEntity {
-    private String name;
-    private String filename;
-    private Object content;
+    private final String name;
+    private final String filename;
+    private final Object content;
+    private final String contentType;
 
-    public MultipartEntity(String name, Object content, String filename) {
+    public MultipartEntity(String name, Object content, String filename, String contentType) {
         this.name = name;
         this.filename = filename;
         this.content = content;
+        this.contentType = contentType;
+    }
+
+    public MultipartEntity(String name, Object content, String filename) {
+        this(name, content, filename, null);
     }
 
     public static String genBoundary(List<MultipartEntity> entities) {
@@ -39,8 +45,10 @@ public class MultipartEntity {
             } else {
                 bytes.append("\"\r\n");
             }
-            if (e.content instanceof File || e.content instanceof InputStream) {
-                // TODO configurable
+
+            if (e.contentType != null) {
+                bytes.append("Content-Type: ").append(e.contentType).append("\r\n\r\n");
+            } else if (e.content instanceof File || e.content instanceof InputStream) {
                 bytes.append("Content-Type: application/octet-stream\r\n\r\n");
             } else {
                 bytes.append("\r\n");
@@ -58,7 +66,13 @@ public class MultipartEntity {
                 while (((ByteBuffer) e.content).hasRemaining()) {
                     bytes.append(((ByteBuffer) e.content).get()); // copy
                 }
-            }
+            } else if (e.content instanceof byte[]) {
+                byte[] contentBytes = (byte[])e.content;
+                bytes.append(contentBytes, contentBytes.length);
+            } else if (e.content instanceof Number) {
+                bytes.append(e.toString(), HttpUtils.UTF_8);
+            } else
+                throw new IllegalArgumentException("Unknown parameter type " + e.content.getClass().getName() + " of parameter " + e.name + ". Try to pass a string.");
             bytes.append(HttpUtils.CR, HttpUtils.LF);
         }
 
